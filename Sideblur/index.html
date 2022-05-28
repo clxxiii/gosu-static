@@ -9,7 +9,11 @@
 	</head>
 
 	<body>
+		<div id="size"></div>
 		<div id="overlay">
+			<div id="error">
+				Can't read from gosumemory, make sure it is launched
+			</div>
 			<div id="metadata">
 				<img class="bg" />
 				<div class="string-container">
@@ -30,21 +34,21 @@
 				<div id="hits">
 					<div
 						class="odometer"
-						style="--background-color: #62c25b77"
+						style="--background-color: var(--hits100)"
 						id="hits100"
 					>
 						1
 					</div>
 					<div
 						class="odometer"
-						style="--background-color: #ded82877"
+						style="--background-color: var(--hits50)"
 						id="hits50"
 					>
 						2
 					</div>
 					<div
 						class="odometer"
-						style="--background-color: #c24f4f77"
+						style="--background-color: var(--hits0)"
 						id="hits0"
 					>
 						3

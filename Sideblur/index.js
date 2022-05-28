@@ -1,4 +1,3 @@
-let socket = new ReconnectingWebSocket(`ws://${location.host}/ws`);
 let queryString = window.location.search;
 queryString = queryString.replace("?", "");
 let queries = {};
@@ -8,17 +7,18 @@ for (const param of params) {
 	queries[keyValue[0]] = keyValue[1];
 }
 
+let socket = new ReconnectingWebSocket(`ws://${location.host}/ws`);
 socket.onopen = () => console.log("Successfully Connected");
-
 socket.onclose = (event) => {
 	console.log("Socket Closed Connection: ", event);
 	socket.send("Client Closed!");
 };
-
 socket.onerror = (error) => console.log("Socket Error: ", error);
 
 let bgs = document.getElementsByClassName("bg");
 let ov = document.getElementById("overlay");
+let error = document.getElementById("error");
+let size = document.getElementById("size");
 let metadata = document.getElementById("metadata");
 let metadataString = document.getElementById("metadata-string");
 let metadataMapId = document.getElementById("metadata-map-id");
@@ -87,10 +87,34 @@ if (queries?.side?.match(/top|left|right|bottom|none/)) {
 	ov.classList.add("ov-" + queries.side);
 } else {
 	metadata.classList.add("top");
-	metadata.classList.add("ov-top");
+	ov.classList.add("ov-top");
+}
+
+let properties = getComputedStyle(metadata);
+
+let totalWidth =
+	parseInt(properties.getPropertyValue("--width").replace("px", "")) +
+	2 * parseInt(properties.getPropertyValue("--box-shadow").replace("px", ""));
+let totalHeight =
+	parseInt(properties.getPropertyValue("--height").replace("px", "")) +
+	2 * parseInt(properties.getPropertyValue("--box-shadow").replace("px", ""));
+size.innerHTML = `Please set browser source dimensions to ${totalWidth}x${totalHeight}`;
+let windowSize = size.getBoundingClientRect();
+if (windowSize.width != totalWidth || windowSize.height != totalHeight) {
+	ov.style.opacity = 0;
+	size.style.opacity = 1;
+	setTimeout(() => {
+		ov.style.opacity = 1;
+		size.style.opacity = 0;
+		resolve;
+	}, 5000);
 }
 
 socket.onmessage = (event) => {
+	setTimeout(() => {
+		metadata.style.opacity = 1;
+		error.style.opacity = 0;
+	}, 1000);
 	try {
 		let data = JSON.parse(event.data);
 		if (temp.id != data.menu.bm.id) {
@@ -164,72 +188,113 @@ socket.onmessage = (event) => {
 
 			if (grade.textContent == "SS") {
 				if (hdfl == true) {
-					grade.style.color = "#E4E4E4";
+					grade.style.color = properties.getPropertyValue("--HDS");
 				} else {
-					grade.style.color = "#FFFB8B";
+					grade.style.color = properties.getPropertyValue("--S");
 				}
 			} else if (grade.textContent == "S") {
 				if (hdfl == true) {
-					grade.style.color = "#E4E4E4";
+					grade.style.color = properties.getPropertyValue("--HDS");
 				} else {
-					grade.style.color = "#FFFB8B";
+					grade.style.color = properties.getPropertyValue("--S");
 				}
 			} else if (grade.textContent == "A") {
-				grade.style.color = "#9DF9AA";
+				grade.style.color = properties.getPropertyValue("--A");
 			} else if (grade.textContent == "B") {
-				grade.style.color = "#9DACF9";
+				grade.style.color = properties.getPropertyValue("--B");
 			} else if (grade.textContent == "C") {
-				grade.style.color = "#ED9DF9";
+				grade.style.color = properties.getPropertyValue("--C");
 			} else {
-				grade.style.color = "#F99D9D";
+				grade.style.color = properties.getPropertyValue("--D");
 			}
 		}
 
 		if (temp.state != data.menu.state) {
-			if (temp.state == 2 || temp.state == 7 || temp.state == 14) {
-				metadataMap.style.transform = "translate(-90px, 0px)";
+			let newState = data.menu.state;
+			let oldState = temp.state;
+
+			let mapLength = metadataMap.getBoundingClientRect().width;
+			let mapTransformX = `calc(-1 * (var(--width) / 2) + (${mapLength}px / 2) +  var(--box-margin))`;
+			let mapTransformY = `calc(var(--height) / 2 - (2 * var(--box-margin)))`;
+
+			// Add middle animation on the following transitions:
+			let middle = false;
+			middle = middle || (oldState == 2 && newState == 5);
+			middle = middle || (oldState == 5 && newState == 2);
+			middle = middle || (oldState == 7 && newState == 5);
+			middle = middle || (oldState == 12 && newState == 13);
+			middle = middle || (oldState == 13 && newState == 12);
+
+			if (middle) {
+				metadataMap.style.transform = `translate(${mapTransformX}, 0%)`;
 			}
-			if (temp.state == 5 && data.menu.state == 7) {
+
+			// Don't animate transition from select to results
+			if (oldState == 5 && newState == 7) {
 				return;
 			}
-			temp.state = data.menu.state;
 
-			if (temp.state == 2 || temp.state == 7 || temp.state == 14) {
-				metadata.style.width = "310px";
-				metadataMap.style.transform = "translate(-90px, 0px)";
+			if (newState == 2 || newState == 7 || newState == 14) {
+				// Stage 1 of transition
+				metadata.style.width = properties.getPropertyValue("--width");
+
+				// Stage 2 of transition
 				setTimeout(() => {
 					hits.style.transform = "translateY(0px)";
-					metadata.style.height = "160px";
-					metadataMap.style.transform = "translate(-90px, 60px)";
+					metadata.style.height =
+						properties.getPropertyValue("--height");
+					metadataMap.style.transform = `translate(${mapTransformX}, ${mapTransformY})`;
 				}, 500);
 
-				if (metadataString.getBoundingClientRect().width >= 290) {
+				// Add over class to title if needed
+				let width = parseInt(
+					properties.getPropertyValue("--width").replace("px", "")
+				);
+				let boxMargin = parseInt(
+					properties
+						.getPropertyValue("--box-margin")
+						.replace("px", "")
+				);
+				let stringMaxWidth = width + 2 * boxMargin;
+				if (
+					metadataString.getBoundingClientRect().width >=
+					stringMaxWidth
+				) {
 					metadataString.classList.add("over");
 				} else {
 					metadataString.classList.remove("over");
 				}
 			} else {
+				// Stage 1 of transition
+				metadata.style.height =
+					properties.getPropertyValue("--small-height");
+				metadataString.classList.remove("over");
+				hits.style.transform = "translateY(125%)";
+
+				// Stage 2 of transition
 				setTimeout(() => {
-					metadata.style.width = "150px";
+					metadata.style.width =
+						properties.getPropertyValue("--small-width");
 					metadataMap.style.transform = "translate(0px, 0px)";
 				}, 500);
-				metadata.style.height = "40px";
-				metadataString.classList.remove("over");
-				hits.style.transform = "translateY(125px)";
 			}
 
-			if (temp.state == 7 || temp.state == 14) {
+			if (newState == 7 || newState == 14) {
 				ppString.style.color = "#AAFFAA";
 				ppString.style.transform = "translateX(-10px) scale(1.2)";
-			} else if (temp.state == 2) {
+			} else if (newState == 2) {
 				ppString.style.color = "#FFFFFF";
 				ppString.style.transform = "translateX(0px) scale(1)";
 			} else {
 				ppString.style.color = "#FFFFFF";
 				ppString.style.transform = "translateX(0px) scale(1)";
 			}
+
+			temp.state = data.menu.state;
 		}
 	} catch (err) {
+		metadata.style.opacity = 0;
+		error.style.opacity = 1;
 		console.log(err);
 	}
 };
